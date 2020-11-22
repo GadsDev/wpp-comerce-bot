@@ -1,7 +1,11 @@
-exports.send = (req, res) => {
-  const {
-    text,
-  } = req.body;
+const Sessions = require("../services/session");
 
-  return res.status(200).json(`Send message: ${text}`);
+exports.send = async (req, res) => {
+  var result = await Sessions.sendText(
+    req.body.sessionName,
+    req.body.number,
+    req.body.text
+  );
+
+  res.json(result);
 }
