@@ -9,24 +9,24 @@ const venom = require('venom-bot');
 module.exports = class Sessions {
 
     static async start(sessionName) {
-        Sessions.sessions = Sessions.sessions || []; //start array
+        try {
+            Sessions.sessions = Sessions.sessions || []; //start array
 
-        var session = Sessions.getSession(sessionName);
-
-        if (session == false) { //create new session
-            session = await Sessions.addSesssion(sessionName);
-        } else if (["CLOSED"].includes(session.state)) { //restart session
-            session.state = "STARTING";
-            session.status = 'notLogged';
-            session.client = Sessions.initSession(sessionName);
-            Sessions.setup(sessionName);
-        } else if (["CONFLICT", "UNPAIRED", "UNLAUNCHED"].includes(session.state)) {
-            session.client.then(client => {
-                client.useHere();
-            });
+            let session = await Sessions.getSession(sessionName);
+    
+            if (session.result == "error") { //create new session
+                session = await Sessions.addSesssion(sessionName);
+            }else if (["CONFLICT", "UNPAIRED", "UNLAUNCHED"].includes(session.state)) {
+                session.client.then(client => {
+                    client.useHere();
+                });
+            }
+            return session;
+            
+        } catch (error) {
+            console.log(`ERRO TO START SESSIONS: ${sessionName}`);
         }
-        return session;
-    }//start
+    }
 
     static async addSesssion(sessionName) {
         var newSession = {
@@ -36,22 +36,20 @@ module.exports = class Sessions {
             status: 'notLogged',
             state: 'STARTING'
         }
-        Sessions.sessions.push(newSession);
-        console.log("newSession.state: " + newSession.state);
-
-        //setup session
+        Sessions.sessions.push(newSession);      
+       
         newSession.client = Sessions.initSession(sessionName);
         Sessions.setup(sessionName);
 
         return newSession;
-    }//addSession
+    }
 
     static async initSession(sessionName) {
-        var session = Sessions.getSession(sessionName);
+        let session = await Sessions.getSession(sessionName);
+      
         const client = await venom.create(
             sessionName,
-            (base64Qr) => {
-                session.state = "QRCODE";
+            (base64Qr) => {              
                 session.qrcode = base64Qr;                
             },
             (statusFind) => {
@@ -103,12 +101,13 @@ module.exports = class Sessions {
     }
 
     static async setup(sessionName) {
-        var session = Sessions.getSession(sessionName);
-        await session.client.then(client => {
+        let session = await Sessions.getSession(sessionName);
 
-            client.onStateChange(state => {
+        await session.client.then(async client => {
+            await client.onStateChange(async state => {
                 console.log("# Change state message", state);
-                session.state = state;               
+                session.state = state;                         
+                if (session.state == "UNPAIRED") await Sessions.closeSession(session.name)
             });
             
             client.onMessage((message) => {
@@ -118,37 +117,48 @@ module.exports = class Sessions {
     }
 
     static async closeSession(sessionName) {
-        var session = Sessions.getSession(sessionName);
-        if (session) { //só adiciona se não existir
-            if (session.state != "CLOSED") {
-                if (session.client)
-                    await session.client.then(async client => {
-                        try {
-                            await client.close();
-                        } catch (error) {
-                            console.log("closeSession ERROR: " + error.message);
-                        }
-                        session.state = "CLOSED";
-                        session.client = false;
-                    });
+        let session = await Sessions.getSession(sessionName);
+      
+        if (session.result !== "error") { 
+            await session.client.then(async client => {               
+                await client.close();
+                //Remove Array ITEM
+                Sessions.sessions.forEach((session, index, object) => {
+                    if (sessionName == session.name) {
+                        object.splice(index, 1);
+                    }
+                }); 
+
                 return { result: "success", message: "CLOSED" };
-            } else {//close
-                return { result: "success", message: session.state };
-            }
+            });
         } else {
             return { result: "error", message: "NOTFOUND" };
         }
-    }//close
+    }
 
-    static getSession(sessionName) {
+    static async getSession(sessionName) {
         var foundSession = false;
-        if (Sessions.sessions)
+        if (Sessions.sessions && Sessions.sessions.status != "desconnectedMobile") {           
             Sessions.sessions.forEach(session => {
                 if (sessionName == session.name) {
                     foundSession = session;
                 }
-            });
-        return foundSession;
+            });   
+        } else {
+            return { result: "error", message: "NOTFOUND" };
+        }                       
+        if (foundSession) {          
+            if (["UNPAIRED_IDLE"].includes(foundSession.state)) {
+                //restart session
+                await Sessions.closeSession(sessionName);
+                Sessions.start(sessionName);
+                return { result: "error", message: foundSession.state };
+            } else { //CONNECTED
+               return foundSession
+            }
+        } else {
+            return { result: "error", message: "NOTFOUND" };
+        }
     }
 
     static getSessions() {
@@ -160,46 +170,31 @@ module.exports = class Sessions {
     }
 
     static async getQrcode(sessionName) {
-        var session = Sessions.getSession(sessionName);
-        if (session) {          
-            if (["UNPAIRED_IDLE"].includes(session.state)) {
-                //restart session
-                await Sessions.closeSession(sessionName);
-                Sessions.start(sessionName);
-                return { result: "error", message: session.state };
-            } else if (["CLOSED"].includes(session.state)) {
-                Sessions.start(sessionName);
-                return { result: "error", message: session.state };
-            } else { //CONNECTED
-                if (session.status != 'isLogged') {
-                    return { result: "success", message: session.state, qrcode: session.qrcode };
-                } else {
-                    return { result: "success", message: session.state };
-                }
-            }
+        var session = await Sessions.getSession(sessionName);
+       
+        if (session.result !== "error") {
+            return session.result.qrcode
         } else {
-            return { result: "error", message: "NOTFOUND" };
+            return null
         }
+            
     } 
 
     static async sendText(sessionName, number, text) {
-        var session = Sessions.getSession(sessionName);
-        if (session) {
-            if (session.state != "UNPAIRED") {
-                await session.client.then(async client => {
-                    return await client.sendText(number + '@c.us', text);
-                });
-                return { result: "success"}
-            } else {
-                return { result: "error", message: session.state };
-            }
+        let session = await Sessions.getSession(sessionName);
+
+        if (session.result != "error") { 
+            await session.client.then(async client => {
+                return await client.sendText(number + '@c.us', text);
+            });
+            return { result: "success"}
         } else {
-            return { result: "error", message: "NOTFOUND" };
-        }
+            return session
+        }       
     }
 
     static async sendFile(sessionName, number, base64Data, fileName, caption) {
-        var session = Sessions.getSession(sessionName);
+        var session = await Sessions.getSession(sessionName);
         if (session) {
             if (session.state == "CONNECTED") {
                 await session.client.then(async (client) => {
