@@ -111,7 +111,7 @@ module.exports = class Sessions {
             });
             
             client.onMessage((message) => {
-               console.log("# Recive message", message);
+            //    console.log("# Recive message", message);
             });
         });
     }
@@ -149,7 +149,7 @@ module.exports = class Sessions {
         }                       
         if (foundSession) {          
             if (["UNPAIRED_IDLE"].includes(foundSession.state)) {
-                //restart session
+                //restart cona
                 await Sessions.closeSession(sessionName);
                 Sessions.start(sessionName);
                 return { result: "error", message: foundSession.state };
@@ -190,6 +190,41 @@ module.exports = class Sessions {
             return { result: "success"}
         } else {
             return session
+        }       
+    }
+
+    static async contactList(sessionName, isSave = false) {
+        let session = await Sessions.getSession(sessionName);
+        if (session.result != "error" && session.status != 'notLogged') { 
+            let responseData = []
+            await session.client.then(async client => {
+                const constacts = await client.getAllContacts()
+                responseData = await constacts.map(currentValue => {    
+                    if (isSave) {
+                        if (currentValue.isMyContact) {
+                            return {
+                                pushname: currentValue.pushname,
+                                name: currentValue.name,
+                                user: currentValue.user,
+                                id: currentValue.id,
+                                isMyContact: currentValue.isMyContact
+                            }
+                        }                        
+                    } else {
+                        return {
+                            pushname: currentValue.pushname,
+                            name: currentValue.name,
+                            user: currentValue.user,
+                            id: currentValue.id,
+                            isMyContact: currentValue.isMyContact                           
+                        }
+                    }
+                    
+                })               
+            });            
+            return { result: "success", ...responseData}
+        } else {
+            return {result: "error", ...session}
         }       
     }
 
