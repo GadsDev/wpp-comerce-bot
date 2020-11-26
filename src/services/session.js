@@ -221,10 +221,15 @@ module.exports = class Sessions {
                     }
                     
                 })               
-            });            
-            return { result: "success", ...responseData}
+            }); 
+            
+            let newArray = responseData.filter(function(item) {
+                return item != null;
+            });
+            
+            return { result: "success", data: newArray}
         } else {
-            return {result: "error", ...session}
+            return {result: "error", data: session}
         }       
     }
 
