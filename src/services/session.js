@@ -21,8 +21,8 @@ module.exports = class Sessions {
                     client.useHere();
                 });
             }
-            return session;
             
+            return session;            
         } catch (error) {
             console.log(`ERRO TO START SESSIONS: ${sessionName}`);
         }
@@ -55,6 +55,7 @@ module.exports = class Sessions {
             (statusFind) => {
                 session.status = statusFind;
                 console.log("# Change Status: " + session.status);
+                console.log("# SESSION: " + session);
             },
             {
                 headless: true,

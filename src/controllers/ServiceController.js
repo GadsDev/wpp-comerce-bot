@@ -1,3 +1,5 @@
+
+const axios = require('axios');
 const Sessions = require("../services/session");
 
 exports.start = async (req, res) => {
@@ -8,9 +10,9 @@ exports.start = async (req, res) => {
     const session = await Sessions.start(sessionName);
 
     if (["CONNECTED", "QRCODE", "STARTING"].includes(session.state)) {
-        res.status(200).json({ result: 'success', message: session.state });
+        res.status(200).json({ success: true, message: session.state, data: session });
     } else {
-        res.status(200).json({ result: 'error', message: session.state });
+        res.status(200).json({ success: false, message: session.state });
     }
 };
 
@@ -32,9 +34,29 @@ exports.getQrCode = async (req, res) => {
             });
             res.end(imageBuffer);
         } else {
-            res.status(200).json({ result: "success", message: session.state, qrcode: session.qrcode });
+            res.status(200).json({ success: true, message: session.state, qrcode: session.qrcode });
         }
     } else {
-        res.status(200).json(session);
+        res.status(200).json({ success: false, message: session.state });
     }
+};
+
+exports.teste = async (req, res) => {
+    res.status(200).json({success: true});
+};
+
+// Session
+// { 
+// 	"name": "session1",
+// 	"status": "status",
+// 	"is_auth": true,
+// 	"phone": "5531987110017",
+	
+// 	"wa_browser_id": "wa_browser_id",
+// 	"wa_secret_bundle": "wa_secret_bundle",
+// 	"wa_token_1": "wa_token_1",
+// 	"wa_token_2": "wa_token_2"	
+// }
+exports.dispatchSession = async (session) => {
+   this.axios.post("http://127.0.0.1:8000/gustavo", session)
 };
