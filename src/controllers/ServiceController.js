@@ -2,6 +2,8 @@
 const axios = require('axios');
 const Sessions = require("../services/session");
 
+const { start, getQrCode, callTeste } = require('../controllers/ServiceController')
+
 exports.start = async (req, res) => {
     const {
         sessionName
@@ -41,22 +43,7 @@ exports.getQrCode = async (req, res) => {
     }
 };
 
-exports.teste = async (req, res) => {
-    res.status(200).json({success: true});
-};
-
-// Session
-// { 
-// 	"name": "session1",
-// 	"status": "status",
-// 	"is_auth": true,
-// 	"phone": "5531987110017",
-	
-// 	"wa_browser_id": "wa_browser_id",
-// 	"wa_secret_bundle": "wa_secret_bundle",
-// 	"wa_token_1": "wa_token_1",
-// 	"wa_token_2": "wa_token_2"	
-// }
-exports.dispatchSession = async (session) => {
-   this.axios.post("http://127.0.0.1:8000/gustavo", session)
+exports.callTeste = async (req, res) => {
+    const data = await Sessions.teste()
+    res.status(200).json({ success: true, message: data });
 };

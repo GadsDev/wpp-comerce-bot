@@ -6,7 +6,16 @@ const fs = require('fs');
 const path = require('path');
 const venom = require('venom-bot');
 
-module.exports = class Sessions {
+const axios = require('axios');
+module.exports = class Sessions {   
+    
+    static async teste() {
+        const {data} = await axios.post("http://localhost:8000/api/wpp/session/auth", {
+            qrCode: true,
+            name: "user_1_31987110017"
+        });
+        return data
+    }
 
     static async start(sessionName) {
         try {
@@ -52,10 +61,13 @@ module.exports = class Sessions {
             (base64Qr) => {              
                 session.qrcode = base64Qr;                
             },
-            (statusFind) => {
+            async (statusFind) => {
                 session.status = statusFind;
-                console.log("# Change Status: " + session.status);
-                console.log("# SESSION: " + session);
+                console.log(`# Session name ${session.name}`);
+                console.log(`# Session status ${session.status}`);
+
+                if (session.status === "qrReadSuccess") await Sessions.dispatchAuthSession(session, true)                
+                if(session.status === "browserClose") await Sessions.dispatchAuthSession(session, false)
             },
             {
                 headless: true,
@@ -252,5 +264,23 @@ module.exports = class Sessions {
         } else {
             return { result: "error", message: "NOTFOUND" };
         }
+    }
+
+    /**
+     { 
+        name: 'user_1_31987110017',
+        qrcode: false,
+        client: Promise { <pending> },
+        status: 'notLogged',
+        state: 'STARTING' 
+     }
+     */
+    static async dispatchAuthSession(session, isAuth) { 
+        await axios.post("http://localhost:8000/api/wpp/session/auth", {
+            qrCode: isAuth,
+            name: session.name,
+            status: session.status,
+            state: session.state
+        });  
     }
 }
